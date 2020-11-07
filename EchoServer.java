@@ -22,7 +22,7 @@ public class EchoServer extends AbstractServer
   /**
    * The default port to listen on.
    */
-  final public static int DEFAULT_PORT = 5555;
+  final public static int DEFAULT_PORT = 6655;
   
   //Constructors ****************************************************
   
@@ -45,11 +45,36 @@ public class EchoServer extends AbstractServer
    * @param msg The message received from the client.
    * @param client The connection from which the message originated.
    */
-  public void handleMessageFromClient
-    (Object msg, ConnectionToClient client)
-  {
-    System.out.println("Message received: " + msg + " from " + client);
-    this.sendToAllClients(msg);
+  public void handleMessageFromClient (Object msg, ConnectionToClient client) {
+	  
+	 String message = msg.toString();
+	 
+	if(message.split(" ")[0].equals("#login")) {
+		
+		if(client.getInfo("Login")==null) {
+			System.out.println("Message received: \"" + msg + "\" from user "+client.getInfo("Login"));
+			client.setInfo("Login", message.split(" ")[1]);	
+			System.out.println(client.getInfo("Login") + " has logged in.");
+			
+		} else {
+			try {
+				client.sendToClient("ERROR: You must disconnect before logging in with a new Login ID.  Terminating connection");
+				client.close();
+			} catch (IOException e) {
+				System.out.println("An error occured while attempting to communicate with the client. Terminating server.");
+				System.exit(1);
+			}
+		}
+	} else if (message.split(" ")[0].equals("#logoff")){ 	
+		this.sendToAllClients(client.getInfo("Login")+" has disconnected.");
+		
+	} else if (message.split(" ")[0].equals("#quit")){ 		
+		this.sendToAllClients(client.getInfo("Login")+" has disconnected.");
+		
+	} else { 
+		System.out.println("Message received: \"" + msg + "\" from user "+client.getInfo("Login"));
+	    this.sendToAllClients(client.getInfo("Login")+": "+ msg);
+	}
   }
     
   /**
@@ -71,6 +96,81 @@ public class EchoServer extends AbstractServer
     System.out.println
       ("Server has stopped listening for connections.");
   }
+  
+  /**
+   * Hook method called each time a new client connection is
+   * accepted. The default implementation does nothing.
+   * @param client the connection connected to the client.
+   */
+  protected void clientConnected(ConnectionToClient client) {
+	  System.out.println("A new client is attempting to connect to SimpleChat");
+  }
+
+  /**
+   * Hook method called each time a client disconnects.
+   * The default implementation does nothing. The method
+   * may be overridden by subclasses but should remains synchronized.
+   *
+   * @param client the connection with the client.
+   */
+  synchronized protected void clientDisconnected(ConnectionToClient client) {
+	  System.out.println(client.getInfo("Login")+" has disconnected from SimpleChat");
+  }
+  
+  public void handleMessageFromServerConsole(String message) throws IOException {
+	  
+	  if(message.charAt(0)=='#') {  
+			
+		String command = message.split(" ")[0];
+		
+		if (command.equals("#start")){		
+	  		if(!super.isListening()) {
+	  			super.listen();
+	  		} else {
+	  			System.out.println("The server is already listening for connections");
+	  		}
+	  		
+		}else if (command.equals("#stop")){
+	  		if(super.isListening()) {
+	  			super.stopListening();
+	  			sendToAllClients("WARNING - The server has stopped listening for connections");
+	  		} else {
+	  			System.out.println("The server has already stopped listening for connecitons");
+	  		}
+	  		
+		} else if(command.equals("#setport")) {
+			if(!super.isListening()) {
+				super.setPort(Integer.parseInt(message.split(" ")[1]));
+			} else {
+				System.out.println("The server must be closed before setting a new port");
+			}
+		
+		}else if (command.equals("#close")){
+			sendToAllClients("SERVER SHUTTING DOWN.  DISCONNECTING FROM SERVER.");
+	  		super.close();
+	  		
+	  	}else if (command.equals("#quit")){
+			super.close();
+			System.exit(0);		
+	  		
+	  	}else if (command.equals("#getport")){		
+			System.out.println("Port: "+super.getPort());
+			
+		}else {
+			System.out.println("Invalid command.");
+		}
+	}else{
+	    try{
+	      sendToAllClients("SERVER MSG> "+message);
+	      
+	    }catch(Exception e){
+	      System.out.println("Could not send message to server.  Terminating client.");
+	    }
+	}
+	  
+  }
+  
+  
   
   //Class methods ***************************************************
   
